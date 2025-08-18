@@ -84,6 +84,7 @@ async function pollForJobs() {
     console.log('Polling for new export jobs...');
     
     // Get next queued job
+    console.log('Fetching jobs from database...');
     const { data: jobs, error } = await supabase
       .from('export_jobs')
       .select('*')
@@ -94,6 +95,22 @@ async function pollForJobs() {
     if (error) {
       console.error('Error fetching jobs:', error);
       return;
+    }
+    
+    // Also get all jobs to see what's in the database
+    const { data: allJobs, error: allJobsError } = await supabase
+      .from('export_jobs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
+      
+    if (!allJobsError) {
+      console.log('Recent jobs in database:', allJobs.map(j => ({
+        id: j.id,
+        status: j.status,
+        created_at: j.created_at,
+        user_id: j.user_id
+      })));
     }
     
     if (!jobs || jobs.length === 0) {
