@@ -5,12 +5,13 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
+const fetch = require('node-fetch');
 
 // Load environment variables with fallbacks
 const config = {
   supabase: {
     url: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    serviceRoleKey: process.env.SUPABASE_SERVICE_KEY,
   },
   worker: {
     port: parseInt(process.env.PORT || '3000'),
@@ -24,7 +25,7 @@ const config = {
 if (!config.supabase.url || !config.supabase.serviceRoleKey) {
   console.error('Missing required environment variables:');
   if (!config.supabase.url) console.error('- SUPABASE_URL');
-  if (!config.supabase.serviceRoleKey) console.error('- SUPABASE_SERVICE_ROLE_KEY');
+  if (!config.supabase.serviceRoleKey) console.error('- SUPABASE_SERVICE_KEY');
   process.exit(1);
 }
 
@@ -49,12 +50,16 @@ const { port: PORT, pollInterval: POLL_INTERVAL, maxConcurrentJobs: MAX_CONCURRE
 // Use a different port for local development to avoid conflicts
 const SERVER_PORT = (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) ? 0 : PORT;
 
-console.log('Configuration:', {
-  supabaseUrl: config.supabase.url ? 'Set' : 'Missing',
-  supabaseKey: config.supabase.serviceRoleKey ? 'Set' : 'Missing',
+console.log('Export Worker Configuration:', {
+  supabaseUrl: config.supabase.url,
+  hasServiceKey: !!config.supabase.serviceRoleKey,
+  serviceKeyType: typeof config.supabase.serviceRoleKey,
   port: PORT,
   serverPort: SERVER_PORT,
-  nodeEnv: process.env.NODE_ENV
+  nodeEnv: process.env.NODE_ENV,
+  tempDir: TEMP_DIR,
+  pollInterval: POLL_INTERVAL,
+  maxConcurrentJobs: MAX_CONCURRENT_JOBS
 });
 
 // Ensure temp directory exists
@@ -137,13 +142,95 @@ async function processJob(job) {
     }
     
     // Download the timeline data
+    console.log('Attempting to download timeline data:', {
+      bucket: 'export_data',
+      path: `${userId}/${jobId}/timeline.json`,
+      userId,
+      jobId
+    });
+
+    // First, check if the file exists
+    const { data: fileList, error: listError } = await supabase
+      .storage
+      .from('export_data')
+      .list(userId);
+
+    if (listError) {
+      console.error('Error listing files in user directory:', {
+        error: listError,
+        userId,
+        bucket: 'export_data'
+      });
+    } else {
+      console.log('Files in user directory:', {
+        files: fileList.map(f => f.name),
+        count: fileList.length,
+        userId
+      });
+    }
+
+    // Try to list the specific file
+    const { data: fileInfo, error: fileError } = await supabase
+      .storage
+      .from('export_data')
+      .list(`${userId}/${jobId}`);
+
+    console.log('Looking for timeline file:', {
+      path: `${userId}/${jobId}`,
+      files: fileInfo?.map(f => f.name),
+      error: fileError?.message
+    });
+
+    // Try to download the file
     const { data: timelineData, error: downloadError } = await supabase
       .storage
       .from('export_data')
       .download(`${userId}/${jobId}/timeline.json`);
       
     if (downloadError) {
-      throw new Error(`Failed to download timeline data: ${downloadError.message}`);
+      console.error('Timeline download error:', {
+        message: downloadError.message,
+        error: downloadError,
+        path: `${userId}/${jobId}/timeline.json`,
+        supabaseUrl: config.supabase.url,
+        hasServiceKey: !!config.supabase.serviceRoleKey,
+        serviceKeyType: typeof config.supabase.serviceRoleKey,
+        errorCode: downloadError.code,
+        errorDetails: downloadError.details,
+        statusCode: downloadError.statusCode
+      });
+
+      // Try alternative path without userId
+      console.log('Trying alternative path...');
+      const { data: altData, error: altError } = await supabase
+        .storage
+        .from('export_data')
+        .download(`${jobId}/timeline.json`);
+
+      if (altError) {
+        console.error('Alternative path failed:', {
+          error: altError,
+          path: `${jobId}/timeline.json`
+        });
+
+        // Try listing the root directory
+        const { data: rootFiles, error: rootError } = await supabase
+          .storage
+          .from('export_data')
+          .list();
+
+        console.log('Root directory contents:', {
+          files: rootFiles?.map(f => f.name),
+          error: rootError?.message
+        });
+
+        throw new Error(`Failed to download timeline data: ${JSON.stringify({
+          message: downloadError.message,
+          code: downloadError.code,
+          details: downloadError.details,
+          statusCode: downloadError.statusCode,
+          altError: altError?.message
+        })}`);
     }
     
     // Parse the timeline data
@@ -225,11 +312,28 @@ async function processJob(job) {
  * Download all media files referenced in the timeline
  */
 async function downloadMediaFiles(timeline, jobDir, userId) {
+  console.log('Starting media file downloads:', {
+    mediaItemCount: Object.keys(timeline.mediaItems || {}).length,
+    jobDir,
+    userId
+  });
+
   const mediaItems = timeline.mediaItems || {};
   const mediaPromises = [];
   
   // Create a map to store file paths for each media ID
   const mediaFilePaths = new Map();
+
+  console.log('Media items to process:', Object.entries(mediaItems).map(([id, item]) => ({
+    id,
+    type: item.type,
+    hasUrl: !!item.url,
+    urlType: item.url ? (
+      item.url.startsWith('data:') ? 'data-url' :
+      item.url.startsWith('blob:') ? 'blob-url' :
+      'regular-url'
+    ) : 'none'
+  })));
   
   for (const [mediaId, mediaItem] of Object.entries(mediaItems)) {
     if (!mediaItem.url) continue;
@@ -269,15 +373,29 @@ async function downloadMediaFiles(timeline, jobDir, userId) {
  */
 async function downloadMediaFile(url, filePath) {
   return new Promise((resolve, reject) => {
+    console.log('Downloading media file:', {
+      url: url.substring(0, 50) + '...',  // Truncate URL for logging
+      filePath,
+      urlType: url.startsWith('data:') ? 'data-url' :
+               url.startsWith('blob:') ? 'blob-url' : 'regular-url'
+    });
+
     // Handle different URL types
     if (url.startsWith('data:')) {
       // Handle data URLs (base64 encoded files)
       try {
         const [, mimeType, base64Data] = url.match(/^data:([^;]+);base64,(.+)$/);
+        console.log('Processing data URL:', { mimeType });
         const buffer = Buffer.from(base64Data, 'base64');
         fs.writeFileSync(filePath, buffer);
+        console.log('Successfully saved data URL to file:', { filePath });
         resolve(filePath);
       } catch (error) {
+        console.error('Failed to process data URL:', {
+          error: error.message,
+          stack: error.stack,
+          filePath
+        });
         reject(new Error(`Failed to decode data URL: ${error.message}`));
       }
       return;
@@ -285,24 +403,48 @@ async function downloadMediaFile(url, filePath) {
     
     if (url.startsWith('blob:')) {
       // For blob URLs, we can't download directly
-      // These should be handled on the frontend before submission
+      console.error('Blob URL detected:', {
+        url: url.substring(0, 50) + '...',
+        filePath
+      });
       reject(new Error(`Cannot download blob URL: ${url}`));
       return;
     }
     
     // For regular URLs, download with fetch
+    console.log('Fetching URL:', {
+      url: url.substring(0, 50) + '...',
+      filePath
+    });
+
     fetch(url)
       .then(response => {
         if (!response.ok) {
-          throw new Error(`Failed to download file: ${response.statusText}`);
+          throw new Error(`Failed to download file: ${response.statusText} (${response.status})`);
         }
+        console.log('Fetch response received:', {
+          status: response.status,
+          contentType: response.headers.get('content-type'),
+          contentLength: response.headers.get('content-length')
+        });
         return response.buffer();
       })
       .then(buffer => {
+        console.log('Writing buffer to file:', {
+          filePath,
+          bufferSize: buffer.length
+        });
         fs.writeFileSync(filePath, buffer);
+        console.log('Successfully saved file:', { filePath });
         resolve(filePath);
       })
       .catch(error => {
+        console.error('Failed to download file:', {
+          error: error.message,
+          stack: error.stack,
+          url: url.substring(0, 50) + '...',
+          filePath
+        });
         reject(error);
       });
   });
