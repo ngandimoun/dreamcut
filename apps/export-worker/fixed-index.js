@@ -1,3 +1,4 @@
+// Fixed Export Worker Code
 require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
@@ -182,7 +183,8 @@ async function processJob(job) {
     });
 
     // Try to download the file
-    const { data: timelineData, error: downloadError } = await supabase
+    let timelineData;
+    const { data, error: downloadError } = await supabase
       .storage
       .from('export_data')
       .download(`${userId}/${jobId}/timeline.json`);
@@ -200,7 +202,7 @@ async function processJob(job) {
         statusCode: downloadError.statusCode
       });
 
-      // Try alternative path without userId (in case the file was stored differently)
+      // Try alternative path without userId
       console.log('Trying alternative path...');
       const { data: altData, error: altError } = await supabase
         .storage
@@ -210,11 +212,10 @@ async function processJob(job) {
       if (altError) {
         console.error('Alternative path failed:', {
           error: altError,
-          path: `${jobId}/timeline.json`,
-          originalPath: `${userId}/${jobId}/timeline.json`
+          path: `${jobId}/timeline.json`
         });
 
-        // Try listing the root directory to see what's available
+        // Try listing the root directory
         const { data: rootFiles, error: rootError } = await supabase
           .storage
           .from('export_data')
@@ -225,48 +226,19 @@ async function processJob(job) {
           error: rootError?.message
         });
 
-        // If we have user directories, try to find the job in any of them
-        if (rootFiles && rootFiles.length > 0) {
-          console.log('Searching for job in user directories...');
-          for (const userDir of rootFiles) {
-            if (userDir.name && userDir.name !== userId) {
-              console.log(`Checking user directory: ${userDir.name}`);
-              const { data: userJobFiles, error: userJobError } = await supabase
-                .storage
-                .from('export_data')
-                .list(`${userDir.name}/${jobId}`);
-              
-              if (!userJobError && userJobFiles && userJobFiles.length > 0) {
-                console.log(`Found job in user directory: ${userDir.name}`);
-                const { data: foundData, error: foundError } = await supabase
-                  .storage
-                  .from('export_data')
-                  .download(`${userDir.name}/${jobId}/timeline.json`);
-                
-                if (!foundError) {
-                  console.log(`Successfully downloaded from: ${userDir.name}/${jobId}/timeline.json`);
-                  timelineData = foundData;
-                  break;
-                }
-              }
-            }
-          }
-        }
-
-        // If we still don't have timelineData, throw the error
-        if (!timelineData) {
-          throw new Error(`Failed to download timeline data: ${JSON.stringify({
-            message: downloadError.message,
-            code: downloadError.code,
-            details: downloadError.details,
-            statusCode: downloadError.statusCode,
-            altError: altError?.message
-          })}`);
-        }
+        throw new Error(`Failed to download timeline data: ${JSON.stringify({
+          message: downloadError.message,
+          code: downloadError.code,
+          details: downloadError.details,
+          statusCode: downloadError.statusCode,
+          altError: altError?.message
+        })}`);
       }
 
       // Use the alternative data if successful
       timelineData = altData;
+    } else {
+      timelineData = data;
     }
     
     // Parse the timeline data
