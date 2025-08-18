@@ -222,19 +222,28 @@ async function processJob(job) {
 
         console.log('Root directory contents:', {
           files: rootFiles?.map(f => f.name),
-          error: rootError?.message
+          error: rootError?.message,
+          rootFilesStructure: rootFiles?.map(f => ({ name: f.name, type: f.type, id: f.id }))
         });
 
         // If we have user directories, try to find the job in any of them
         if (rootFiles && rootFiles.length > 0) {
           console.log('Searching for job in user directories...');
+          console.log('Available user directories:', rootFiles.map(f => f.name));
+          
           for (const userDir of rootFiles) {
+            console.log(`Processing userDir:`, userDir);
             if (userDir.name) {
               console.log(`Checking user directory: ${userDir.name}`);
               const { data: userJobFiles, error: userJobError } = await supabase
                 .storage
                 .from('export_data')
                 .list(`${userDir.name}/${jobId}`);
+              
+              console.log(`Job files in ${userDir.name}/${jobId}:`, {
+                files: userJobFiles?.map(f => f.name),
+                error: userJobError?.message
+              });
               
               if (!userJobError && userJobFiles && userJobFiles.length > 0) {
                 console.log(`Found job in user directory: ${userDir.name}`);
@@ -247,6 +256,8 @@ async function processJob(job) {
                   console.log(`Successfully downloaded from: ${userDir.name}/${jobId}/timeline.json`);
                   timelineData = foundData;
                   break;
+                } else {
+                  console.log(`Failed to download from ${userDir.name}/${jobId}/timeline.json:`, foundError);
                 }
               }
             }
