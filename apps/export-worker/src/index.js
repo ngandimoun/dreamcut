@@ -206,10 +206,15 @@ async function processJob(job) {
     });
 
     // Try to download the file
-    const { data: timelineData, error: downloadError } = await supabase
+    let timelineData;
+    const { data, error: downloadError } = await supabase
       .storage
       .from('export_data')
       .download(`${userId}/${jobId}/timeline.json`);
+      
+    if (!downloadError) {
+      timelineData = data;
+    }
       
     if (downloadError) {
       console.error('Timeline download error:', {
