@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createRouteHandlerClient } from "@/lib/supabase/server-utils";
+import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from "uuid";
 
 import { CreateExportJobRequest, ExportJob, ExportJobResponse } from "@/lib/export/types";
@@ -70,15 +71,72 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Create a Supabase client with service role key for storage operations
+    const serviceClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
     // Store the timeline data in Supabase Storage for the worker to process
+    console.log('Preparing to upload timeline data:', {
+      userId,
+      jobId,
+      bucket: 'export_data',
+      dataSize: JSON.stringify(body.timeline_data).length
+    });
+
     const timelineDataString = JSON.stringify(body.timeline_data);
-    const { error: storageError } = await supabase
+    
+    // First check if we can list the bucket
+    const { data: buckets, error: bucketError } = await serviceClient
+      .storage
+      .listBuckets();
+    
+    console.log('Available buckets:', {
+      buckets: buckets?.map(b => b.id),
+      error: bucketError?.message
+    });
+
+    // Try to list the user's directory
+    const { data: files, error: listError } = await serviceClient
+      .storage
+      .from('export_data')
+      .list(userId);
+
+    console.log('User directory contents:', {
+      files: files?.map(f => f.name),
+      error: listError?.message
+    });
+
+    // Upload the timeline data
+    const { error: storageError } = await serviceClient
       .storage
       .from('export_data')
       .upload(`${userId}/${jobId}/timeline.json`, timelineDataString, {
         contentType: 'application/json',
         upsert: true
       });
+
+    if (storageError) {
+      console.error('Failed to upload timeline data:', {
+        error: storageError,
+        userId,
+        jobId,
+        path: `${userId}/${jobId}/timeline.json`
+      });
+    } else {
+      console.log('Successfully uploaded timeline data:', {
+        userId,
+        jobId,
+        path: `${userId}/${jobId}/timeline.json`
+      });
+    }
       
     if (storageError) {
       console.error("Failed to store timeline data:", storageError);

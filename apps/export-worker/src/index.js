@@ -117,7 +117,7 @@ async function pollForJobs() {
     console.log(`Starting to process job ${job.id} for project ${job.project_id}`);
     
     // Process the job
-    processJob(job);
+    await processJob(job);
     
   } catch (error) {
     console.error('Error in poll cycle:', error);
@@ -231,6 +231,10 @@ async function processJob(job) {
           statusCode: downloadError.statusCode,
           altError: altError?.message
         })}`);
+      }
+
+      // Use the alternative data if successful
+      timelineData = altData;
     }
     
     // Parse the timeline data
