@@ -115,13 +115,20 @@ export async function POST(request: NextRequest) {
     });
 
     // Upload the timeline data
-    const { error: storageError } = await serviceClient
+    console.log('Attempting to upload timeline data to:', `${userId}/${jobId}/timeline.json`);
+    const { data: uploadData, error: storageError } = await serviceClient
       .storage
       .from('export_data')
       .upload(`${userId}/${jobId}/timeline.json`, timelineDataString, {
         contentType: 'application/json',
         upsert: true
       });
+    
+    console.log('Upload result:', {
+      data: uploadData,
+      error: storageError,
+      path: `${userId}/${jobId}/timeline.json`
+    });
 
     if (storageError) {
       console.error('Failed to upload timeline data:', {
