@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { createRouteHandlerClient } from "@/lib/supabase/server-utils";
 import { v4 as uuidv4 } from "uuid";
 
-import { Database } from "@/lib/supabase/types";
 import { CreateExportJobRequest, ExportJob, ExportJobResponse } from "@/lib/export/types";
 import { calculateTimelineDuration } from "@/lib/timeline";
 import { rateLimiter } from "@/lib/rate-limit";
@@ -27,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Initialize Supabase client
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = await createRouteHandlerClient();
     
     // Check if user is authenticated
     const { data: { session } } = await supabase.auth.getSession();

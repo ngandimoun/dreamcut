@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { createRouteHandlerClient } from "@/lib/supabase/server-utils";
 
-import { Database } from "@/lib/supabase/types";
 import { ExportJob } from "@/lib/export/types";
 
 export async function GET(request: NextRequest) {
   try {
     // Initialize Supabase client
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const supabase = await createRouteHandlerClient();
     
     // Check if user is authenticated
     const { data: { session } } = await supabase.auth.getSession();

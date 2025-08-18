@@ -1,6 +1,7 @@
 import { TProject } from "@/types/project";
 import { create } from "zustand";
 import { storageService } from "@/lib/storage/storage-service";
+import { supabaseStorageService } from "@/lib/storage/supabase-storage-service";
 import { toast } from "sonner";
 import { useMediaStore } from "./media-store";
 import { useTimelineStore } from "./timeline-store";
@@ -104,7 +105,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     };
 
     try {
-      await storageService.saveProject(updatedProject);
+      await supabaseStorageService.saveProject(updatedProject);
       set({ activeProject: updatedProject });
       await get().loadAllProjects(); // Refresh the list
     } catch (error) {
@@ -152,7 +153,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     };
 
     try {
-      await storageService.saveProject(updatedProject);
+      await supabaseStorageService.saveProject(updatedProject);
       set({ activeProject: updatedProject });
       await get().loadAllProjects(); // Refresh the list
     } catch (error) {
@@ -164,17 +165,18 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   createNewProject: async (name: string) => {
-    const newProject: TProject = { ...DEFAULT_PROJECT, name };
-
-    set({ activeProject: newProject });
-
     try {
-      await storageService.saveProject(newProject);
+      // Create project in Supabase
+      const newProject = await supabaseStorageService.createProject(name);
+      
+      set({ activeProject: newProject });
+      
       // Reload all projects to update the list
       await get().loadAllProjects();
       return newProject.id;
     } catch (error) {
-      toast.error("Failed to save new project");
+      console.error("Failed to create new project:", error);
+      toast.error("Failed to create new project");
       throw error;
     }
   },
@@ -191,7 +193,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     timelineStore.clearTimeline();
 
     try {
-      const project = await storageService.loadProject(id);
+      const project = await supabaseStorageService.loadProject(id);
       if (project) {
         set({ activeProject: project });
 
@@ -219,7 +221,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       // Save project metadata and timeline data in parallel
       const timelineStore = useTimelineStore.getState();
       await Promise.all([
-        storageService.saveProject(activeProject),
+        supabaseStorageService.saveProject(activeProject),
         timelineStore.saveProjectTimeline(activeProject.id),
       ]);
       await get().loadAllProjects(); // Refresh the list
@@ -234,7 +236,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }
 
     try {
-      const projects = await storageService.loadAllProjects();
+      const projects = await supabaseStorageService.loadAllProjects();
       set({ savedProjects: projects });
     } catch (error) {
       console.error("Failed to load projects:", error);
@@ -249,7 +251,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       await Promise.all([
         storageService.deleteProjectMedia(id),
         storageService.deleteProjectTimeline(id),
-        storageService.deleteProject(id),
+        supabaseStorageService.deleteProject(id),
       ]);
       await get().loadAllProjects(); // Refresh the list
 
@@ -296,8 +298,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     };
 
     try {
-      // Save to storage
-      await storageService.saveProject(updatedProject);
+      // Save to Supabase
+      await supabaseStorageService.saveProject(updatedProject);
 
       await get().loadAllProjects();
 
@@ -317,7 +319,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   duplicateProject: async (projectId: string) => {
     try {
-      const project = await storageService.loadProject(projectId);
+      const project = await supabaseStorageService.loadProject(projectId);
       if (!project) {
         toast.error("Project not found", {
           description: "Please try again",
@@ -351,7 +353,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         updatedAt: new Date(),
       };
 
-      await storageService.saveProject(newProject);
+      await supabaseStorageService.saveProject(newProject);
       await get().loadAllProjects();
       return newProject.id;
     } catch (error) {
@@ -375,7 +377,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     };
 
     try {
-      await storageService.saveProject(updatedProject);
+      await supabaseStorageService.saveProject(updatedProject);
       set({ activeProject: updatedProject });
       await get().loadAllProjects(); // Refresh the list
     } catch (error) {
@@ -404,7 +406,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     };
 
     try {
-      await storageService.saveProject(updatedProject);
+      await supabaseStorageService.saveProject(updatedProject);
       set({ activeProject: updatedProject });
       await get().loadAllProjects(); // Refresh the list
     } catch (error) {
@@ -426,7 +428,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     };
 
     try {
-      await storageService.saveProject(updatedProject);
+      await supabaseStorageService.saveProject(updatedProject);
       set({ activeProject: updatedProject });
       await get().loadAllProjects(); // Refresh the list
     } catch (error) {
@@ -449,7 +451,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     };
 
     try {
-      await storageService.saveProject(updatedProject);
+      await supabaseStorageService.saveProject(updatedProject);
       set({ activeProject: updatedProject });
       await get().loadAllProjects(); // Refresh the list
     } catch (error) {

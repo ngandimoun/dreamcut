@@ -51,3 +51,52 @@ export function findElementsInTimeRange(
   
   return result;
 }
+
+/**
+ * Check if two elements overlap in time
+ * @param element1 First timeline element
+ * @param element2 Second timeline element
+ * @returns True if elements overlap, false otherwise
+ */
+export function checkElementOverlaps(
+  element1: TimelineElement,
+  element2: TimelineElement
+): boolean {
+  const element1Start = element1.startTime;
+  const element1End = element1.startTime + element1.duration;
+  const element2Start = element2.startTime;
+  const element2End = element2.startTime + element2.duration;
+  
+  return element1End > element2Start && element1Start < element2End;
+}
+
+/**
+ * Resolve overlaps between elements by adjusting their positions
+ * @param elements Array of timeline elements to resolve overlaps for
+ * @returns Array of elements with resolved overlaps
+ */
+export function resolveElementOverlaps(elements: TimelineElement[]): TimelineElement[] {
+  if (elements.length <= 1) return elements;
+  
+  const sortedElements = [...elements].sort((a, b) => a.startTime - b.startTime);
+  const resolvedElements: TimelineElement[] = [];
+  
+  for (const element of sortedElements) {
+    let adjustedElement = { ...element };
+    
+    // Check for overlaps with already resolved elements
+    for (const resolvedElement of resolvedElements) {
+      if (checkElementOverlaps(adjustedElement, resolvedElement)) {
+        // Move the current element to start after the resolved element
+        adjustedElement = {
+          ...adjustedElement,
+          startTime: resolvedElement.startTime + resolvedElement.duration
+        };
+      }
+    }
+    
+    resolvedElements.push(adjustedElement);
+  }
+  
+  return resolvedElements;
+}

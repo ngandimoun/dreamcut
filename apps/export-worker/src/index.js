@@ -6,20 +6,56 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 
+// Load environment variables with fallbacks
+const config = {
+  supabase: {
+    url: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  },
+  worker: {
+    port: parseInt(process.env.PORT || '3000'),
+    pollInterval: parseInt(process.env.POLL_INTERVAL || '10000'),
+    maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS || '2'),
+    tempDir: process.env.TEMP_DIR || '/tmp/opencut-exports'
+  }
+};
+
+// Validate required configuration
+if (!config.supabase.url || !config.supabase.serviceRoleKey) {
+  console.error('Missing required environment variables:');
+  if (!config.supabase.url) console.error('- SUPABASE_URL');
+  if (!config.supabase.serviceRoleKey) console.error('- SUPABASE_SERVICE_ROLE_KEY');
+  process.exit(1);
+}
+
 // Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // Initialize Supabase client with service role key
 const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  config.supabase.url,
+  config.supabase.serviceRoleKey,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
 );
 
-// Settings
-const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || '10000');
-const MAX_CONCURRENT_JOBS = parseInt(process.env.MAX_CONCURRENT_JOBS || '2');
-const TEMP_DIR = process.env.TEMP_DIR || '/tmp/opencut-exports';
+// Use settings from config
+const { port: PORT, pollInterval: POLL_INTERVAL, maxConcurrentJobs: MAX_CONCURRENT_JOBS, tempDir: TEMP_DIR } = config.worker;
+
+// Use a different port for local development to avoid conflicts
+const SERVER_PORT = (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) ? 0 : PORT;
+
+console.log('Configuration:', {
+  supabaseUrl: config.supabase.url ? 'Set' : 'Missing',
+  supabaseKey: config.supabase.serviceRoleKey ? 'Set' : 'Missing',
+  port: PORT,
+  serverPort: SERVER_PORT,
+  nodeEnv: process.env.NODE_ENV
+});
 
 // Ensure temp directory exists
 if (!fs.existsSync(TEMP_DIR)) {
@@ -234,10 +270,23 @@ async function downloadMediaFiles(timeline, jobDir, userId) {
 async function downloadMediaFile(url, filePath) {
   return new Promise((resolve, reject) => {
     // Handle different URL types
-    if (url.startsWith('blob:') || url.startsWith('data:')) {
+    if (url.startsWith('data:')) {
+      // Handle data URLs (base64 encoded files)
+      try {
+        const [, mimeType, base64Data] = url.match(/^data:([^;]+);base64,(.+)$/);
+        const buffer = Buffer.from(base64Data, 'base64');
+        fs.writeFileSync(filePath, buffer);
+        resolve(filePath);
+      } catch (error) {
+        reject(new Error(`Failed to decode data URL: ${error.message}`));
+      }
+      return;
+    }
+    
+    if (url.startsWith('blob:')) {
       // For blob URLs, we can't download directly
       // These should be handled on the frontend before submission
-      reject(new Error(`Cannot download blob/data URL: ${url}`));
+      reject(new Error(`Cannot download blob URL: ${url}`));
       return;
     }
     
@@ -353,8 +402,8 @@ app.post('/webhook/new-job', (req, res) => {
 });
 
 // Start the server
-app.listen(PORT, () => {
-  console.log(`Export worker server running on port ${PORT}`);
+app.listen(SERVER_PORT, () => {
+  console.log(`Export worker server running on port ${SERVER_PORT}`);
   
   // Start polling
   console.log('Export job polling starting...');
