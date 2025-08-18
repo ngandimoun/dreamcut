@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "check-connection": "node src/check-connection.js"
+    "check-connection": "node src/check-connection.js",
+    "build": "echo 'No build step required'",
+    "postinstall": "echo 'Export worker dependencies installed'"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.38.0",
