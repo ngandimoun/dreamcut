@@ -263,10 +263,10 @@ async function processJob(job) {
             altError: altError?.message
           })}`);
         }
+      } else {
+        // Use the alternative data if successful
+        timelineData = altData;
       }
-
-      // Use the alternative data if successful
-      timelineData = altData;
     }
     
     // Parse the timeline data
