@@ -59,9 +59,18 @@ export async function POST(request: NextRequest) {
     };
     
     // Insert the job into the database
-    const { error: dbError } = await supabase
+    console.log('Creating export job:', {
+      jobId,
+      userId,
+      projectId: body.project_id,
+      status: newJob.status
+    });
+    
+    const { data: createdJob, error: dbError } = await supabase
       .from('export_jobs')
-      .insert(newJob);
+      .insert(newJob)
+      .select()
+      .single();
       
     if (dbError) {
       console.error("Failed to create export job:", dbError);
@@ -70,6 +79,12 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+    
+    console.log('Successfully created export job:', {
+      id: createdJob.id,
+      status: createdJob.status,
+      created_at: createdJob.created_at
+    });
     
     // Create a Supabase client with service role key for storage operations
     const serviceClient = createClient(
@@ -137,27 +152,29 @@ export async function POST(request: NextRequest) {
         jobId,
         path: `${userId}/${jobId}/timeline.json`
       });
+      
+      console.error("Failed to store timeline data:", storageError);
+      
+      // Update job status to failed
+      const { error: updateError } = await supabase
+        .from('export_jobs')
+        .update({ status: 'failed', error_message: 'Failed to store timeline data' })
+        .eq('id', jobId);
+        
+      if (updateError) {
+        console.error("Failed to update job status:", updateError);
+      }
+        
+      return NextResponse.json(
+        { error: "Failed to store timeline data", message: storageError.message },
+        { status: 500 }
+      );
     } else {
       console.log('Successfully uploaded timeline data:', {
         userId,
         jobId,
         path: `${userId}/${jobId}/timeline.json`
       });
-    }
-      
-    if (storageError) {
-      console.error("Failed to store timeline data:", storageError);
-      
-      // Update job status to failed
-      await supabase
-        .from('export_jobs')
-        .update({ status: 'failed', error_message: 'Failed to store timeline data' })
-        .eq('id', jobId);
-        
-      return NextResponse.json(
-        { error: "Failed to store timeline data", message: storageError.message },
-        { status: 500 }
-      );
     }
     
     // Return the job information
