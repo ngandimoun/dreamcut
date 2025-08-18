@@ -6,6 +6,7 @@ import { HeaderBase } from "./header-base";
 import { useProjectStore } from "@/stores/project-store";
 import { KeyboardShortcutsHelp } from "./keyboard-shortcuts-help";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,11 +17,13 @@ import {
 import Link from "next/link";
 import { RenameProjectDialog } from "./rename-project-dialog";
 import { DeleteProjectDialog } from "./delete-project-dialog";
+import { ExportDialog } from "./export-dialog";
 import { useRouter } from "next/navigation";
 import { FaDiscord } from "react-icons/fa6";
 import { useTheme } from "next-themes";
 import { TransitionUpIcon } from "./icons";
 import { PanelPresetSelector } from "./panel-preset-selector";
+
 
 export function EditorHeader() {
   const { activeProject, renameProject, deleteProject } = useProjectStore();
@@ -139,25 +142,7 @@ export function EditorHeader() {
 }
 
 function ExportButton() {
-  const handleExport = () => {
-    // TODO: Implement export functionality
-    // NOTE: This is already being worked on
-    console.log("Export project");
-    window.open("https://youtube.com/watch?v=dQw4w9WgXcQ", "_blank");
-  };
-
   return (
-    <button
-      className="flex items-center gap-1.5 bg-[#38BDF8] text-white rounded-md px-[0.12rem] py-[0.12rem] cursor-pointer hover:brightness-95 transition-all duration-200"
-      onClick={handleExport}
-    >
-      <div className="flex items-center gap-1.5 bg-linear-270 from-[#2567EC] to-[#37B6F7] rounded-[0.8rem] px-4 py-1 relative shadow-[0_1px_3px_0px_rgba(0,0,0,0.65)]">
-        <TransitionUpIcon className="z-50" />
-        <span className="text-[0.875rem] z-50">Export</span>
-        <div className="absolute w-full h-full left-0 top-0 bg-linear-to-t from-white/0 to-white/50 z-10 rounded-[0.8rem] flex items-center justify-center">
-          <div className="absolute w-[calc(100%-2px)] h-[calc(100%-2px)] top-[0.08rem] bg-linear-270 from-[#2567EC] to-[#37B6F7] z-50 rounded-[0.8rem]"></div>
-        </div>
-      </div>
-    </button>
+    <ExportDialog />
   );
 }

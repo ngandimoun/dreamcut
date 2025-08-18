@@ -8,6 +8,24 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   productionBrowserSourceMaps: true,
   output: "standalone",
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Avoid bundling Node built-ins for server code
+      config.externals = [
+        ...(config.externals || []),
+        {
+          child_process: "commonjs child_process",
+          fs: "commonjs fs",
+          worker_threads: "commonjs worker_threads",
+          os: "commonjs os",
+          path: "commonjs path",
+          stream: "commonjs stream",
+          util: "commonjs util",
+        },
+      ];
+    }
+    return config;
+  },
   images: {
     remotePatterns: [
       {

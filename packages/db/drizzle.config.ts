@@ -19,6 +19,7 @@ export default {
   },
   dbCredentials: {
     url: DATABASE_URL,
+    ssl: true, // Required for Supabase
   },
   out: "./migrations",
   strict: NODE_ENV === "production",

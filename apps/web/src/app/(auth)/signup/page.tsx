@@ -10,31 +10,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { memo, Suspense } from "react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { GoogleIcon } from "@/components/icons";
-import { useSignUp } from "@/hooks/auth/useSignUp";
+import SignUpWithGoogleButton from "@/components/auth/SignUpWithGoogleButton";
 
 const SignUpPage = () => {
   const router = useRouter();
-  const {
-    name,
-    setName,
-    email,
-    setEmail,
-    password,
-    setPassword,
-    error,
-    isAnyLoading,
-    isEmailLoading,
-    isGoogleLoading,
-    handleSignUp,
-    handleGoogleSignUp,
-  } = useSignUp();
 
   return (
     <div className="flex h-screen items-center justify-center relative">
@@ -42,6 +24,7 @@ const SignUpPage = () => {
         variant="text"
         onClick={() => router.back()}
         className="absolute top-6 left-6"
+        type="button"
       >
         <ArrowLeft className="h-5 w-5" /> Back
       </Button>
@@ -63,25 +46,8 @@ const SignUpPage = () => {
             }
           >
             <div className="flex flex-col space-y-6">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              <Button
-                onClick={handleGoogleSignUp}
-                variant="outline"
-                size="lg"
-                disabled={isAnyLoading}
-              >
-                {isGoogleLoading ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <GoogleIcon />
-                )}{" "}
-                Continue with Google
-              </Button>
+              <SignUpWithGoogleButton />
+              
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <Separator className="w-full" />
@@ -92,55 +58,10 @@ const SignUpPage = () => {
                   </span>
                 </div>
               </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="John Doe"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    disabled={isAnyLoading}
-                    className="h-11"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="m@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={isAnyLoading}
-                    className="h-11"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Create a strong password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={isAnyLoading}
-                    className="h-11"
-                  />
-                </div>
-                <Button
-                  onClick={handleSignUp}
-                  disabled={isAnyLoading || !name || !email || !password}
-                  className="w-full h-11"
-                  size="lg"
-                >
-                  {isEmailLoading ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    "Create account"
-                  )}
-                </Button>
+              
+              <div className="text-center text-sm text-muted-foreground">
+                For now, we only support Google Sign-Up. 
+                Email/password registration will be available soon.
               </div>
             </div>
             <div className="mt-6 text-center text-sm">

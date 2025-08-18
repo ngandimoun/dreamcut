@@ -1,54 +1,53 @@
-import { TimelineElement } from "@/types/timeline";
+import { TimelineTrack, TimelineElement } from "@/types/timeline";
 
-// Helper function to check for element overlaps and prevent invalid timeline states
-export const checkElementOverlaps = (elements: TimelineElement[]): boolean => {
-  // Sort elements by start time
-  const sortedElements = [...elements].sort(
-    (a, b) => a.startTime - b.startTime
-  );
-
-  for (let i = 0; i < sortedElements.length - 1; i++) {
-    const current = sortedElements[i];
-    const next = sortedElements[i + 1];
-
-    const currentEnd =
-      current.startTime +
-      (current.duration - current.trimStart - current.trimEnd);
-
-    // Check if current element overlaps with next element
-    if (currentEnd > next.startTime) return true; // Overlap detected
-  }
-
-  return false; // No overlaps
-};
-
-// Helper function to resolve overlaps by adjusting element positions
-export const resolveElementOverlaps = (
-  elements: TimelineElement[]
-): TimelineElement[] => {
-  // Sort elements by start time
-  const sortedElements = [...elements].sort(
-    (a, b) => a.startTime - b.startTime
-  );
-  const resolvedElements: TimelineElement[] = [];
-
-  for (let i = 0; i < sortedElements.length; i++) {
-    const current = { ...sortedElements[i] };
-
-    if (resolvedElements.length > 0) {
-      const previous = resolvedElements[resolvedElements.length - 1];
-      const previousEnd =
-        previous.startTime +
-        (previous.duration - previous.trimStart - previous.trimEnd);
-
-      // If current element would overlap with previous, push it after previous ends
-      if (current.startTime < previousEnd) {
-        current.startTime = previousEnd;
+/**
+ * Calculate the total duration of a timeline based on all tracks and elements
+ * @param tracks Array of timeline tracks
+ * @returns Duration in seconds
+ */
+export function calculateTimelineDuration(tracks: TimelineTrack[]): number {
+  if (!tracks || tracks.length === 0) return 0;
+  
+  let maxEndTime = 0;
+  
+  // Find the maximum end time across all elements in all tracks
+  tracks.forEach(track => {
+    track.elements.forEach(element => {
+      const elementEndTime = element.startTime + element.duration;
+      if (elementEndTime > maxEndTime) {
+        maxEndTime = elementEndTime;
       }
-    }
+    });
+  });
+  
+  return maxEndTime;
+}
 
-    resolvedElements.push(current);
-  }
-
-  return resolvedElements;
-};
+/**
+ * Find all elements within a specific time range
+ * @param tracks Array of timeline tracks
+ * @param startTime Start time in seconds
+ * @param endTime End time in seconds
+ * @returns Array of elements that overlap with the time range
+ */
+export function findElementsInTimeRange(
+  tracks: TimelineTrack[],
+  startTime: number,
+  endTime: number
+): { element: TimelineElement; track: TimelineTrack }[] {
+  const result: { element: TimelineElement; track: TimelineTrack }[] = [];
+  
+  tracks.forEach(track => {
+    track.elements.forEach(element => {
+      const elementStartTime = element.startTime;
+      const elementEndTime = element.startTime + element.duration;
+      
+      // Check if the element overlaps with the time range
+      if (elementEndTime > startTime && elementStartTime < endTime) {
+        result.push({ element, track });
+      }
+    });
+  });
+  
+  return result;
+}

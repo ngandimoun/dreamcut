@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { storageService } from "@/lib/storage/storage-service";
+import { supabase } from "@/lib/supabase";
 import { useTimelineStore } from "./timeline-store";
 import { generateUUID } from "@/lib/utils";
 
@@ -173,9 +174,34 @@ export const useMediaStore = create<MediaStore>((set, get) => ({
       mediaItems: [...state.mediaItems, newItem],
     }));
 
-    // Save to persistent storage in background
+    // Save to persistent storage in background and upload to Supabase for a public URL
     try {
       await storageService.saveMediaItem(projectId, newItem);
+
+      // Try to upload to Supabase storage and attach a public URL
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        let bucket = "videos" as const;
+        if (newItem.type === "image") bucket = (process.env.NEXT_PUBLIC_MEDIA_IMAGE_BUCKET as any) || "images2";
+        if (newItem.type === "audio") bucket = (process.env.NEXT_PUBLIC_TTS_AUDIO_BUCKET as any) || "ttsaudio";
+
+        const path = `${user.id}/${projectId}/uploads/${newItem.id}`;
+        const { error: uploadErr } = await supabase.storage
+          .from(bucket)
+          .upload(path, newItem.file, { upsert: true, cacheControl: "3600" });
+
+        if (!uploadErr) {
+          const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
+          if (pub?.publicUrl) {
+            // Update in-memory URL to the public one for export usage
+            set((state) => ({
+              mediaItems: state.mediaItems.map((m) =>
+                m.id === newItem.id ? { ...m, url: pub.publicUrl } : m
+              ),
+            }));
+          }
+        }
+      }
     } catch (error) {
       console.error("Failed to save media item:", error);
       // Remove from local state if save failed

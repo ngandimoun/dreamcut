@@ -1,11 +1,10 @@
 import type { Config } from "drizzle-kit";
-import * as dotenv from "dotenv";
 
 // Load the right env file based on environment
 if (process.env.NODE_ENV === "production") {
-  dotenv.config({ path: ".env.production" });
+  require("dotenv").config({ path: ".env.production" });
 } else {
-  dotenv.config({ path: ".env.local" });
+  require("dotenv").config({ path: ".env.local" });
 }
 
 export default {
@@ -13,6 +12,7 @@ export default {
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL!,
+    ssl: true, // Required for Supabase
   },
   out: "./migrations",
   strict: process.env.NODE_ENV === "production",

@@ -4,12 +4,17 @@ import * as schema from "./schema";
 import { keys } from "./keys";
 
 const { DATABASE_URL } = keys();
+
 // Create a lazy database instance that only initializes when accessed
 let _db: ReturnType<typeof drizzle> | null = null;
 
 function getDb() {
   if (!_db) {
-    const client = postgres(DATABASE_URL);
+    // Use Supabase connection string
+    const client = postgres(DATABASE_URL, {
+      ssl: 'require', // Required for Supabase
+      max: 1, // Connection pool size
+    });
     _db = drizzle(client, { schema });
   }
 

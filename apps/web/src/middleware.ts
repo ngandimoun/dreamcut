@@ -1,24 +1,16 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-export async function middleware(request: NextRequest) {
-  // Handle fuckcapcut.com domain redirect
-  if (request.headers.get("host") === "fuckcapcut.com") {
-    return NextResponse.redirect("https://opencut.app/why-not-capcut", 301);
-  }
-
+export async function middleware(req: NextRequest) {
+  // For now, we'll handle authentication in the components
+  // This avoids the Supabase middleware compatibility issue with Next.js 15
+  
+  // You can add basic route protection here later when the compatibility issue is resolved
+  // or when you upgrade to a compatible version of Supabase auth helpers
+  
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ['/projects/:path*', '/login', '/signup'],
 };
