@@ -229,7 +229,7 @@ async function processJob(job) {
         if (rootFiles && rootFiles.length > 0) {
           console.log('Searching for job in user directories...');
           for (const userDir of rootFiles) {
-            if (userDir.name && userDir.name !== userId) {
+            if (userDir.name) {
               console.log(`Checking user directory: ${userDir.name}`);
               const { data: userJobFiles, error: userJobError } = await supabase
                 .storage
