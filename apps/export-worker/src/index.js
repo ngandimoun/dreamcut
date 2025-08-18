@@ -101,6 +101,13 @@ async function pollForJobs() {
       return;
     }
     
+    console.log('Available jobs:', jobs.map(j => ({
+      id: j.id,
+      status: j.status,
+      created_at: j.created_at,
+      project_id: j.project_id
+    })));
+    
     const job = jobs[0];
     
     // Mark job as processing
@@ -114,7 +121,7 @@ async function pollForJobs() {
       return;
     }
     
-    console.log(`Starting to process job ${job.id} for project ${job.project_id}`);
+    console.log(`Starting to process job ${job.id} for project ${job.project_id} at ${new Date().toISOString()}`);
     
     // Process the job
     await processJob(job);
